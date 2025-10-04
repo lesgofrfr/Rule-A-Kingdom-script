@@ -1,0 +1,46 @@
+--// Draggable Obsidian GUI: Arrest All Players
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+-- Create ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "ObsidianArrestGUI"
+gui.ResetOnSpawn = false
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Create Tab Frame (Draggable)
+local tabFrame = Instance.new("Frame")
+tabFrame.Size = UDim2.new(0, 200, 0, 100)
+tabFrame.Position = UDim2.new(0, 20, 0, 20)
+tabFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- Black
+tabFrame.BorderSizePixel = 0
+tabFrame.Active = true
+tabFrame.Draggable = true
+tabFrame.Parent = gui
+
+-- Create "Arrest All" Button
+local arrestButton = Instance.new("TextButton")
+arrestButton.Size = UDim2.new(0, 180, 0, 40)
+arrestButton.Position = UDim2.new(0, 10, 0, 30)
+arrestButton.Text = "Arrest All"
+arrestButton.BackgroundColor3 = Color3.fromRGB(0, 102, 204) -- Blue
+arrestButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+arrestButton.Font = Enum.Font.GothamBold
+arrestButton.TextSize = 20
+arrestButton.Parent = tabFrame
+
+-- Arrest Logic
+arrestButton.MouseButton1Click:Connect(function()
+	local criminalSystem = ReplicatedStorage:FindFirstChild("CriminalSystem")
+	if criminalSystem and criminalSystem:IsA("RemoteEvent") then
+		for _, targetPlayer in ipairs(Players:GetPlayers()) do
+			local args = {
+				"Arrested",
+				targetPlayer
+			}
+			criminalSystem:FireServer(unpack(args))
+		end
+	end
+end)
