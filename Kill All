@@ -1,0 +1,42 @@
+--// Finite Storm GUI: Kill All Except Self (100 Damage)
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local DamageEvent = ReplicatedStorage:WaitForChild("DamageEvent")
+
+-- Create GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "SigmaPulseGUI"
+gui.ResetOnSpawn = false
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Create Frame (larger size)
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 100) -- Increased width and height
+frame.Position = UDim2.new(0, 30, 0, 30)
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+
+-- Create "Kill All" Button (adjusted size and position)
+local killButton = Instance.new("TextButton")
+killButton.Size = UDim2.new(0, 180, 0, 60) -- Slightly larger button
+killButton.Position = UDim2.new(0, 10, 0, 20) -- Centered within the larger frame
+killButton.Text = "Kill All"
+killButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+killButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+killButton.Font = Enum.Font.GothamBold
+killButton.TextSize = 20
+killButton.Parent = frame
+
+-- Kill Logic
+killButton.MouseButton1Click:Connect(function()
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
+			DamageEvent:FireServer(player.Character.Humanoid, 100)
+		end
+	end
+end)
