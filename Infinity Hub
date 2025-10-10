@@ -1,0 +1,184 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local criminalSystem = ReplicatedStorage:WaitForChild("CriminalSystem")
+
+local excludedPlayers = {}
+
+-- Create Infinity Hub GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "InfinityHub"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+local hubFrame = Instance.new("Frame")
+hubFrame.Size = UDim2.new(0, 320, 0, 200)
+hubFrame.Position = UDim2.new(0.5, -160, 0.5, -100)
+hubFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+hubFrame.Active = true
+hubFrame.Draggable = true
+hubFrame.Parent = screenGui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Text = "Infinity Hub"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.SourceSansBold
+title.TextScaled = true
+title.Parent = hubFrame
+
+local jailGuiButton = Instance.new("TextButton")
+jailGuiButton.Size = UDim2.new(0, 140, 0, 40)
+jailGuiButton.Position = UDim2.new(0, 20, 0, 60)
+jailGuiButton.Text = "Open Jail GUI"
+jailGuiButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+jailGuiButton.TextColor3 = Color3.new(1, 1, 1)
+jailGuiButton.Parent = hubFrame
+
+local excludeGuiButton = Instance.new("TextButton")
+excludeGuiButton.Size = UDim2.new(0, 140, 0, 40)
+excludeGuiButton.Position = UDim2.new(0, 160, 0, 60)
+excludeGuiButton.Text = "Exclusion List"
+excludeGuiButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+excludeGuiButton.TextColor3 = Color3.new(1, 1, 1)
+excludeGuiButton.Parent = hubFrame
+
+-- Popup function
+local function showPopup(message, isSuccess)
+	local popup = Instance.new("TextLabel")
+	popup.Size = UDim2.new(0, 300, 0, 40)
+	popup.Position = UDim2.new(0.5, -150, 0, 0)
+	popup.BackgroundTransparency = 0.3
+	popup.TextColor3 = Color3.new(1, 1, 1)
+	popup.TextScaled = true
+	popup.Text = message
+	popup.BackgroundColor3 = isSuccess and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+	popup.Parent = screenGui
+
+	task.delay(4, function()
+		popup:Destroy()
+	end)
+end
+
+-- Jail GUI
+local function createJailGui()
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(0, 300, 0, 150)
+	frame.Position = UDim2.new(0.5, -150, 0.5, -75)
+	frame.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+	frame.Active = true
+	frame.Draggable = true
+	frame.Parent = screenGui
+
+	local textBox = Instance.new("TextBox")
+	textBox.Size = UDim2.new(0, 200, 0, 40)
+	textBox.Position = UDim2.new(0.5, -100, 0, 20)
+	textBox.PlaceholderText = "Enter name"
+	textBox.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
+	textBox.TextColor3 = Color3.new(1, 1, 1)
+	textBox.Parent = frame
+
+	local jailButton = Instance.new("TextButton")
+	jailButton.Size = UDim2.new(0, 100, 0, 40)
+	jailButton.Position = UDim2.new(0.5, -50, 0, 80)
+	jailButton.Text = "Jail"
+	jailButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+	jailButton.TextColor3 = Color3.new(1, 1, 1)
+	jailButton.Parent = frame
+
+	local closeButton = Instance.new("TextButton")
+	closeButton.Size = UDim2.new(0, 30, 0, 30)
+	closeButton.Position = UDim2.new(1, -35, 0, 5)
+	closeButton.Text = "X"
+	closeButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+	closeButton.TextColor3 = Color3.new(1, 1, 1)
+	closeButton.Parent = frame
+
+	closeButton.MouseButton1Click:Connect(function()
+		frame:Destroy()
+	end)
+
+	jailButton.MouseButton1Click:Connect(function()
+		local input = textBox.Text:lower()
+		local jailed = {}
+
+		if input == "all" or input == "everyone" then
+			for _, player in ipairs(Players:GetPlayers()) do
+				local name = player.Name:lower()
+				local display = player.DisplayName:lower()
+				if player ~= Players.LocalPlayer and not excludedPlayers[name] and not excludedPlayers[display] then
+					criminalSystem:FireServer("Arrested", player)
+					table.insert(jailed, player.DisplayName)
+				end
+			end
+		else
+			for _, player in ipairs(Players:GetPlayers()) do
+				local name = player.Name:lower()
+				local display = player.DisplayName:lower()
+				if (name == input or name:sub(1, #input) == input or display == input or display:sub(1, #input) == input)
+					and not excludedPlayers[name] and not excludedPlayers[display] then
+					criminalSystem:FireServer("Arrested", player)
+					table.insert(jailed, player.DisplayName)
+					break
+				end
+			end
+		end
+
+		if #jailed > 0 then
+			showPopup("✅ Jailed: " .. table.concat(jailed, ", "), true)
+		else
+			showPopup("❌ Failure: Player not found or excluded", false)
+		end
+	end)
+end
+
+-- Exclusion GUI
+local function createExclusionGui()
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(0, 300, 0, 150)
+	frame.Position = UDim2.new(0.5, -150, 0.5, -75)
+	frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	frame.Active = true
+	frame.Draggable = true
+	frame.Parent = screenGui
+
+	local textBox = Instance.new("TextBox")
+	textBox.Size = UDim2.new(0, 200, 0, 40)
+	textBox.Position = UDim2.new(0.5, -100, 0, 20)
+	textBox.PlaceholderText = "Exclude name"
+	textBox.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
+	textBox.TextColor3 = Color3.new(1, 1, 1)
+	textBox.Parent = frame
+
+	local excludeButton = Instance.new("TextButton")
+	excludeButton.Size = UDim2.new(0, 100, 0, 40)
+	excludeButton.Position = UDim2.new(0.5, -50, 0, 80)
+	excludeButton.Text = "Exclude"
+	excludeButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+	excludeButton.TextColor3 = Color3.new(1, 1, 1)
+	excludeButton.Parent = frame
+
+	local closeButton = Instance.new("TextButton")
+	closeButton.Size = UDim2.new(0, 30, 0, 30)
+	closeButton.Position = UDim2.new(1, -35, 0, 5)
+	closeButton.Text = "X"
+	closeButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+	closeButton.TextColor3 = Color3.new(1, 1, 1)
+	closeButton.Parent = frame
+
+	closeButton.MouseButton1Click:Connect(function()
+		frame:Destroy()
+	end)
+
+	excludeButton.MouseButton1Click:Connect(function()
+		local name = textBox.Text:lower()
+		if name ~= "" then
+			excludedPlayers[name] = true
+			showPopup("✅ Excluded: " .. name, true)
+		end
+	end)
+end
+
+-- Button triggers
+jailGuiButton.MouseButton1Click:Connect(createJailGui)
+excludeGuiButton.MouseButton1Click:Connect(createExclusionGui)
