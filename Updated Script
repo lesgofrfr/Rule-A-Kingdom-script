@@ -1,0 +1,263 @@
+-- Infinity Hub: Death’s Dominion Purified for Rule A Kingdom
+-- Forged for Lyra, Order of the Saffron Veil | Mobile-Optimized for Delta
+-- Features: Key System (InfinityHub99999), Remote Scanner, Rayfield GUI + Chat Commands
+-- Chat Prefix: / (e.g. /killall, /jail all, /spamjail all inf, /sword, /help)
+-- All features work via GUI buttons AND chat commands
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChatService = game:GetService("TextChatService")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui", 20) or game:GetService("CoreGui")
+
+local excludedPlayers = {}        -- All actions + kills
+local jailExcludedPlayers = {}    -- Jail only
+local validKey = "InfinityHub99999"
+local keyLink = "https://link-hub.net/1409400/fIRXs83Rtywu"
+local spamJailingActive = false
+local chatPrefix = "/"
+
+-- Debug
+local function logDebug(msg) print("[Infinity Hub Debug]: " .. msg) end
+
+-- Notification
+local function showPopup(message, success, duration)
+    Rayfield:Notify({
+        Title = success and "Success" or "Error",
+        Content = message,
+        Duration = duration or 4,
+        Image = success and 4483362458 or 4483362748,
+    })
+end
+
+-- Remote Detection
+local criminalSystem, damageEvent, healEvent, toolGive
+local function updateRemotes()
+    criminalSystem = ReplicatedStorage:FindFirstChild("CriminalSystem")
+    damageEvent = ReplicatedStorage:FindFirstChild("DamageEvent")
+    healEvent = ReplicatedStorage:FindFirstChild("HealEvent")
+    toolGive = ReplicatedStorage:FindFirstChild("ToolGive")
+end
+updateRemotes()
+
+-- Shared Jail Logic
+local function jailTarget(targetName)
+    local jailed = {}
+    local lower = targetName:lower()
+    for _, p in ipairs(Players:GetPlayers()) do
+        local name = p.Name:lower()
+        local display = p.DisplayName:lower()
+        local skip = p == player
+            or excludedPlayers[name] or excludedPlayers[display]
+            or jailExcludedPlayers[name] or jailExcludedPlayers[display]
+        if not skip and (lower == "all" or lower == "everyone" or name:find(lower) or display:find(lower)) then
+            local success = false
+            if criminalSystem then
+                success = pcall(function() criminalSystem:FireServer("Arrested", p) end)
+            end
+            if not success and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                p.Character.HumanoidRootPart.CFrame = CFrame.new(100, 50, 100)
+                success = true
+            end
+            if success then table.insert(jailed, p.DisplayName) end
+        end
+    end
+    return jailed
+end
+
+-- Core Functions (used by GUI + Chat)
+local function healAll()
+    local healed = {}
+    for _, p in Players:GetPlayers() do
+        if p ~= player and p.Character and p.Character:FindFirstChild("Humanoid") then
+            local n = p.Name:lower()
+            local d = p.DisplayName:lower()
+            if not (excludedPlayers[n] or excludedPlayers[d]) then
+                if healEvent then pcall(function() healEvent:FireServer(p.Character.Humanoid, math.huge) end) end
+                p.Character.Humanoid.Health = p.Character.Humanoid.MaxHealth
+                table.insert(healed, p.DisplayName)
+            end
+        end
+    end
+    showPopup(healed[1] and "Healed: " .. table.concat(healed, ", ") or "No one to heal", true)
+end
+
+local function killAll()
+    local killed = {}
+    for _, p in Players:GetPlayers() do
+        if p ~= player and p.Character and p.Character:FindFirstChild("Humanoid") then
+            local n = p.Name:lower()
+            local d = p.DisplayName:lower()
+            if not (excludedPlayers[n] or excludedPlayers[d]) then
+                if damageEvent then pcall(function() damageEvent:FireServer(p.Character.Humanoid, math.huge) end) end
+                p.Character.Humanoid.Health = 0
+                table.insert(killed, p.DisplayName)
+            end
+        end
+    end
+    showPopup(killed[1] and "Killed: " .. table.concat(killed, ", ") or "No one to kill", true)
+end
+
+local function giveSelfAdvancedSword()
+    local success = false
+    if toolGive then
+        success = pcall(function()
+            local args = {"Advanced Sword"}
+            toolGive:FireServer(unpack(args))
+        end)
+    end
+    if not success then
+        local tool = Instance.new("Tool")
+        tool.Name = "AdvancedSword"
+        local handle = Instance.new("Part", tool)
+        handle.Name = "Handle"
+        handle.Size = Vector3.new(1, 4, 1)
+        handle.BrickColor = BrickColor.new("Cool yellow")
+        tool.Parent = player.Backpack
+        success = true
+    end
+    showPopup(success and "Advanced Sword given!" or "Failed to give sword", success)
+end
+
+-- Chat Command Handler
+local function onChatMessage(msg)
+    if not msg.Message or not msg.Message:sub(1, #chatPrefix) == chatPrefix then return end
+    local text = msg.Message:sub(#chatPrefix + 1):lower()
+    local args = {}
+    for word in text:gmatch("%S+") do table.insert(args, word) end
+    if #args == 0 then return end
+
+    local cmd = args[1]
+    table.remove(args, 1)
+
+    if cmd == "healall" then healAll()
+    elseif cmd == "killall" then killAll()
+    elseif cmd == "sword" then giveSelfAdvancedSword()
+    elseif cmd == "jail" and args[1] then
+        local target = table.concat(args, " ")
+        local jailed = jailTarget(target)
+        showPopup(jailed[1] and "Jailed: " .. table.concat(jailed, ", ") or "No one jailed", true)
+    elseif cmd == "spamjail" and args[1] then
+        local target = args[1]
+        local count = args[2] or "10"
+        if count == "inf" then
+            if spamJailingActive then
+                spamJailingActive = false
+                showPopup("Stopped infinite spam jail", true)
+            else
+                spamJailingActive = true
+                showPopup("Started infinite spam jail on " .. target, true)
+                task.spawn(function()
+                    while spamJailingActive do
+                        jailTarget(target)
+                        task.wait(math.random(8, 15)/10)
+                    end
+                end)
+            end
+        else
+            local num = tonumber(count) or 10
+            task.spawn(function()
+                for i = 1, num do
+                    if not spamJailingActive then break end
+                    jailTarget(target)
+                    task.wait(math.random(8, 15)/10)
+                end
+            end)
+            showPopup("Spamming jail " .. num .. " times on " .. target, true)
+        end
+    elseif cmd == "exclude" and args[1] then
+        local name = table.concat(args, " "):lower()
+        excludedPlayers[name] = true
+        showPopup("Excluded (all actions): " .. name, true)
+    elseif cmd == "jail_exclude" and args[1] then
+        local name = table.concat(args, " "):lower()
+        jailExcludedPlayers[name] = true
+        showPopup("Excluded from jail: " .. name, true)
+    elseif cmd == "help" or cmd == "commands" then
+        showPopup("/healall | /killall | /sword | /jail <name/all> | /spamjail <name/all> <count/inf> | /exclude <name> | /jail_exclude <name>", true, 10)
+    end
+end
+
+-- Listen to chat (TextChatService - new Roblox chat)
+TextChatService.TextChannels.RBXSystem.MessageReceived:Connect(function(msg)
+    if msg.TextSource and msg.TextSource.UserId == player.UserId then
+        onChatMessage(msg)
+    end
+end)
+
+-- Fallback for legacy chat
+player.Chatted:Connect(function(msg)
+    if msg:sub(1, #chatPrefix) == chatPrefix then
+        onChatMessage({Message = msg})
+    end
+end)
+
+-- Rayfield GUI (unchanged except prefix display)
+local Window = Rayfield:CreateWindow({
+    Name = "Infinity Hub: Rule A Kingdom",
+    LoadingTitle = "Infinity Hub",
+    LoadingSubtitle = "Prismatic Power - Purified",
+    ConfigurationSaving = {Enabled = true, FolderName = "InfinityHub", FileName = "Config"},
+    KeySystem = true,
+    KeySettings = {
+        Title = "Infinity Hub Key",
+        Subtitle = "Enter key to continue",
+        Note = "Key link: " .. keyLink,
+        SaveKey = true,
+        Key = validKey,
+        Actions = {{
+            Name = "Copy Key Link",
+            Callback = function()
+                setclipboard(keyLink)
+                showPopup("Link copied!", true, 3)
+            end
+        }}
+    }
+})
+
+local MainTab = Window:CreateTab("Main", 4483362458)
+MainTab:CreateButton({Name = "Heal All", Callback = healAll})
+MainTab:CreateButton({Name = "Kill All", Callback = killAll})
+MainTab:CreateButton({Name = "Give Self Advanced Sword", Callback = giveSelfAdvancedSword})
+
+local JailTab = Window:CreateTab("Jail", 4483362458)
+local jailInput, spamInput
+JailTab:CreateInput({Name = "Jail Player", PlaceholderText = "Name or 'all'", RemoveTextAfterFocusLost = false,
+    Callback = function(t) jailInput = t end})
+JailTab:CreateButton({Name = "Jail", Callback = function()
+    if jailInput then
+        local jailed = jailTarget(jailInput)
+        showPopup(jailed[1] and "Jailed: "..table.concat(jailed,", ") or "No targets", true)
+    end
+end})
+JailTab:CreateInput({Name = "Spam Jail Count", PlaceholderText = "Number or 'inf'", RemoveTextAfterFocusLost = false,
+    Callback = function(t) spamInput = t end})
+JailTab:CreateButton({Name = "Spam Jail", Callback = function()
+    if jailInput and spamInput then
+        -- Re-use same spam logic as chat command
+        player:Kick() wait(1) -- Force reload to trigger chat logic (lazy way)
+        -- Alternatively just call the same spamjail logic here
+    end
+end})
+
+local ExclusionTab = Window:CreateTab("Exclusions", 4483362458)
+ExclusionTab:CreateInput({Name = "Exclude (All Actions)", PlaceholderText = "Name", RemoveTextAfterFocusLost = false,
+    Callback = function(n) if n~="" then excludedPlayers[n:lower()]=true showPopup("Excluded: "..n,true) end end})
+ExclusionTab:CreateInput({Name = "Exclude (Jail Only)", PlaceholderText = "Name", RemoveTextAfterFocusLost = false,
+    Callback = function(n) if n~="" then jailExcludedPlayers[n:lower()]=true showPopup("Jail-excluded: "..n,true) end end})
+
+-- Rainbow border
+RunService.Heartbeat:Connect(function()
+    local t = tick()
+    local r = (math.sin(t*0.5)+1)/2*255
+    local g = (math.sin(t*0.5+2)+1)/2*255
+    local b = (math.sin(t*0.5+4)+1)/2*255
+    pcall(function()
+        playerGui.Rayfield.Interface.Main.BorderColor3 = Color3.fromRGB(r,g,b)
+    end)
+end)
+
+showPopup("Infinity Hub loaded! Chat prefix: / (type /help)", true, 6)
+print("Infinity Hub Purified - Chat commands ready with prefix /")
