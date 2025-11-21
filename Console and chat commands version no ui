@@ -1,0 +1,258 @@
+--[[
+ .____                  ________ ___.    _____                           __                
+ |    |    __ _______   \_____  \\_ |___/ ____\_ __  ______ ____ _____ _/  |_  ___________ 
+ |    |   |  |  \__  \   /   |   \| __ \   __\  |  \/  ___// ___\\__  \\   __\/  _ \_  __ \
+ |    |___|  |  // __ \_/    |    \ \_\ \  | |  |  /\___ \\  \___ / __ \|  | (  <_> )  | \/
+ |_______ \____/(____  /\_______  /___  /__| |____//____  >\___  >____  /__|  \____/|__|   
+         \/          \/         \/    \/                \/     \/     \/                   
+          \_Welcome to LuaObfuscator.com   (Alpha 0.10.9) ~  Much Love, Ferib 
+
+]]--
+
+local Players = game:GetService("Players");
+local RunService = game:GetService("RunService");
+local ReplicatedStorage = game:GetService("ReplicatedStorage");
+local TextChatService = game:GetService("TextChatService");
+local player = Players.LocalPlayer;
+local excludedPlayers = {};
+local jailExcludedPlayers = {};
+local spamJailingActive = false;
+local chatPrefix = "/";
+task.spawn(function()
+	repeat
+		task.wait(0.5);
+	until #ReplicatedStorage:GetChildren() > 0 
+	local criminalSystem = ReplicatedStorage:FindFirstChild("CriminalSystem");
+	local damageEvent = ReplicatedStorage:FindFirstChild("DamageEvent");
+	local healEvent = ReplicatedStorage:FindFirstChild("HealEvent");
+	local toolGive = ReplicatedStorage:FindFirstChild("ToolGive");
+	print("[Infinity Hub]: Remotes loaded - Jail:", criminalSystem ~= nil, "Damage:", damageEvent ~= nil);
+end);
+local function findPlayer(partial)
+	partial = partial:lower();
+	for _, p in Players:GetPlayers() do
+		if (p.Name:lower():find(partial) or p.DisplayName:lower():find(partial)) then
+			return p;
+		end
+	end
+	return nil;
+end
+local function notify(msg, success)
+	local icon = (success and "✅") or "❌";
+	print("[Infinity Hub]: " .. icon .. " " .. msg);
+end
+local function jailPlayer(name)
+	local p = findPlayer(name);
+	if (not p or (p == player)) then
+		return notify("Player not found or is you!", false);
+	end
+	local n, d = p.Name:lower(), p.DisplayName:lower();
+	if (excludedPlayers[n] or excludedPlayers[d] or jailExcludedPlayers[n] or jailExcludedPlayers[d]) then
+		return notify(p.DisplayName .. " is excluded!", false);
+	end
+	local success = false;
+	local criminalSystem = ReplicatedStorage:FindFirstChild("CriminalSystem");
+	if criminalSystem then
+		success = pcall(function()
+			criminalSystem:FireServer("Arrested", p);
+		end);
+	end
+	if (not success and p.Character and p.Character:FindFirstChild("HumanoidRootPart")) then
+		p.Character.HumanoidRootPart.CFrame = CFrame.new(100, 50, 100);
+		success = true;
+	end
+	notify((success and ("Jailed: " .. p.DisplayName)) or ("Failed to jail " .. p.DisplayName), success);
+end
+local function killPlayer(name)
+	local p = findPlayer(name);
+	if (not p or (p == player)) then
+		return notify("Player not found or is you!", false);
+	end
+	local n, d = p.Name:lower(), p.DisplayName:lower();
+	if (excludedPlayers[n] or excludedPlayers[d]) then
+		return notify(p.DisplayName .. " is excluded!", false);
+	end
+	local hum = p.Character and p.Character:FindFirstChild("Humanoid");
+	if hum then
+		local damageEvent = ReplicatedStorage:FindFirstChild("DamageEvent");
+		if damageEvent then
+			pcall(function()
+				damageEvent:FireServer(hum, math.huge);
+			end);
+		end
+		hum.Health = 0;
+		notify("Killed: " .. p.DisplayName, true);
+	else
+		notify("No Humanoid for " .. p.DisplayName, false);
+	end
+end
+local function jailAll()
+	local count = 0;
+	for _, p in Players:GetPlayers() do
+		if (p ~= player) then
+			jailPlayer(p.Name);
+			count = count + 1;
+		end
+	end
+	notify("Jailed " .. count .. " players!", true);
+end
+local function killAll()
+	local count = 0;
+	for _, p in Players:GetPlayers() do
+		if (p ~= player) then
+			killPlayer(p.Name);
+			count = count + 1;
+		end
+	end
+	notify("Killed " .. count .. " players!", true);
+end
+local function giveSword()
+	local success = false;
+	local toolGive = ReplicatedStorage:FindFirstChild("ToolGive");
+	if toolGive then
+		success = pcall(function()
+			local args = {"Advanced Sword"};
+			toolGive:FireServer(unpack(args));
+		end);
+	end
+	if not success then
+		local tool = Instance.new("Tool");
+		tool.Name = "AdvancedSword";
+		local handle = Instance.new("Part");
+		handle.Name = "Handle";
+		handle.Size = Vector3.new(1, 4, 1);
+		handle.BrickColor = BrickColor.new("Cool yellow");
+		handle.Parent = tool;
+		tool.Parent = player.Backpack;
+		success = true;
+	end
+	notify((success and "Advanced Sword equipped!") or "Failed to get sword", success);
+end
+local function healAll()
+	local count = 0;
+	local healEvent = ReplicatedStorage:FindFirstChild("HealEvent");
+	for _, p in Players:GetPlayers() do
+		if ((p ~= player) and p.Character and p.Character:FindFirstChild("Humanoid")) then
+			local n, d = p.Name:lower(), p.DisplayName:lower();
+			if not (excludedPlayers[n] or excludedPlayers[d]) then
+				if healEvent then
+					pcall(function()
+						healEvent:FireServer(p.Character.Humanoid, math.huge);
+					end);
+				end
+				p.Character.Humanoid.Health = p.Character.Humanoid.MaxHealth;
+				count = count + 1;
+			end
+		end
+	end
+	notify(((count > 0) and ("Healed " .. count .. " players!")) or "No one to heal", count > 0);
+end
+local function spamJail(target, countStr)
+	if (countStr:lower() == "inf") then
+		spamJailingActive = not spamJailingActive;
+		notify((spamJailingActive and ("Infinite spam jail ON for " .. target)) or "Spam jail stopped", true);
+		if spamJailingActive then
+			task.spawn(function()
+				while spamJailingActive do
+					if (target:lower() == "all") then
+						jailAll();
+					else
+						jailPlayer(target);
+					end
+					task.wait(math.random(0.5, 1.5));
+				end
+			end);
+		end
+		return;
+	end
+	local num = tonumber(countStr) or 10;
+	task.spawn(function()
+		for i = 1, num do
+			if not spamJailingActive then
+				break;
+			end
+			if (target:lower() == "all") then
+				jailAll();
+			else
+				jailPlayer(target);
+			end
+			task.wait(math.random(0.5, 1.5));
+		end
+		notify("Finished spamming " .. num .. " jails on " .. target, true);
+	end);
+	notify("Spamming " .. num .. " jails on " .. target, true);
+end
+local function processChat(msgObj)
+	local msg = msgObj.Text or msgObj.Message or "";
+	if (not msg:sub(1, #chatPrefix) == chatPrefix) then
+		return;
+	end
+	local fullMsg = msg:sub(#chatPrefix + 1);
+	local args = {};
+	for word in fullMsg:gmatch("%S+") do
+		table.insert(args, word);
+	end
+	if (#args == 0) then
+		return;
+	end
+	local cmd = args[1]:lower();
+	table.remove(args, 1);
+	if (cmd == "healall") then
+		healAll();
+	elseif (cmd == "killall") then
+		killAll();
+	elseif (cmd == "jailall") then
+		jailAll();
+	elseif (cmd == "sword") then
+		giveSword();
+	elseif ((cmd == "jail") and args[1]) then
+		local target = table.concat(args, " ");
+		if (target:lower() == "all") then
+			jailAll();
+		else
+			jailPlayer(target);
+		end
+	elseif ((cmd == "kill") and args[1]) then
+		killPlayer(table.concat(args, " "));
+	elseif ((cmd == "spamjail") and args[1]) then
+		local target = args[1];
+		local count = args[2] or "10";
+		spamJail(target, count);
+	elseif ((cmd == "exclude") and args[1]) then
+		local name = table.concat(args, " "):lower();
+		excludedPlayers[name] = true;
+		notify("Excluded (all): " .. name, true);
+	elseif ((cmd == "jail_exclude") and args[1]) then
+		local name = table.concat(args, " "):lower();
+		jailExcludedPlayers[name] = true;
+		notify("Jail-Excluded: " .. name, true);
+	elseif (cmd == "help") then
+		notify("Commands:\n/healall\n/killall\n/jailall\n/jail <name/all>\n/kill <name>\n/spamjail <name/all> <count/inf>\n/sword\n/exclude <name>\n/jail_exclude <name>", true);
+	end
+end
+if TextChatService then
+	TextChatService.TextChannels.RBXSystem.MessageReceived:Connect(function(msg)
+		if (msg.TextSource and (msg.TextSource.UserId == player.UserId)) then
+			processChat({Text=msg.Text});
+		end
+	end);
+end
+player.Chatted:Connect(function(msg)
+	processChat({Message=msg});
+end);
+print("=== INFINITY HUB LOADED (Delta Mobile) ===");
+print("Chat Prefix: / | Type /help for commands");
+print("Features: /healall, /killall, /jail <name/all>, /kill <name>, /sword, /spamjail <name> inf, /exclude <name>");
+print("Smart Detection: /jail Roblox finds 'RobloxPlayer1233' | /jail Cool finds DisplayName 'CoolGuy'");
+print("Exclusions: /exclude name (all actions) | /jail_exclude name (jail only)");
+print("=== Prismatic Power Activated! ===");
+task.spawn(function()
+	while true do
+		local time = tick();
+		local r = math.floor(((math.sin(time * 0.5) + 1) / 2) * 255);
+		local g = math.floor(((math.sin((time * 0.5) + 2) + 1) / 2) * 255);
+		local b = math.floor(((math.sin((time * 0.5) + 4) + 1) / 2) * 255);
+		print("\027[38;2;" .. r .. ";" .. g .. ";" .. b .. "m[Infinity Hub Active]\027[0m");
+		task.wait(5);
+	end
+end);
